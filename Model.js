@@ -1,6 +1,10 @@
 var NODE_NAME = "omavoice"
 var CAPTURE_NAME = "omavoice.capture"
 var NODE_DESCRIPTION = "Omavoice"
+// Apple Silicon exposes the built-in microphone as a mapped virtual source
+// (Omarchy's asahi mic mapping), never as alsa_input.*. The only alsa_input.*
+// node on those Macs is the headset jack, which exists even when it is empty.
+var APPLE_BUILTIN_SOURCE = "omarchy_asahi_mic"
 var PRESETS = ["meeting", "podcast", "clean"]
 var QUALITIES = ["good", "better", "best"]
 var ENGINES = ["auto", "rnnoise", "deepfilter"]
@@ -68,9 +72,14 @@ function isUsbSourceName(name) {
   return String(name || "").indexOf("alsa_input.usb-") === 0
 }
 
+function isAppleBuiltinSourceName(name) {
+  return String(name || "") === APPLE_BUILTIN_SOURCE
+}
+
 function isCaptureSourceName(name) {
   var value = String(name || "")
   if (!value || isOmavoiceName(value)) return false
+  if (isAppleBuiltinSourceName(value)) return true
   if (value.indexOf("alsa_input.") === 0) return true
   if (value.indexOf("bluez_input.") === 0) return true
   if (value.indexOf("bluez_capture") === 0) return false
@@ -82,6 +91,7 @@ function sourceKind(name) {
   if (isOmavoiceName(value)) return "omavoice"
   if (isUsbSourceName(value)) return "usb"
   if (value.indexOf("bluez_input.") === 0) return "bluetooth"
+  if (isAppleBuiltinSourceName(value)) return "builtin"
   if (value.indexOf("alsa_input.") === 0) return "builtin"
   return "other"
 }
@@ -181,6 +191,10 @@ function pickSource(sources, pinnedName, defaultName, preferredName) {
   if (usb.length === 1) return usb[0]
   if (usb.length > 0) return usb[0]
   if (fallback && isCaptureSourceName(fallback.name)) return fallback
+  // Prefer the mapped built-in mic over the first alsa_input.*, which on
+  // Apple Silicon is the headset jack and exists even when nothing is plugged.
+  var appleBuiltin = findName(APPLE_BUILTIN_SOURCE)
+  if (appleBuiltin) return appleBuiltin
   for (var k = 0; k < list.length; k++) {
     if (sourceKind(list[k].name) === "builtin") return list[k]
   }
@@ -539,6 +553,7 @@ if (typeof module !== "undefined") {
     isOmavoiceName: isOmavoiceName,
     isOmavoiceNode: isOmavoiceNode,
     isUsbSourceName: isUsbSourceName,
+    isAppleBuiltinSourceName: isAppleBuiltinSourceName,
     isCaptureSourceName: isCaptureSourceName,
     sourceKind: sourceKind,
     bluetoothAddress: bluetoothAddress,

@@ -14,6 +14,10 @@ const builtin = {
   name: "alsa_input.pci-0000_00_1f.3-platform-sof_sdw.HiFi__Mic__source",
   description: "Microphones"
 }
+const appleBuiltin = {
+  name: "omarchy_asahi_mic",
+  description: "MacBook Microphone"
+}
 const omavoice = {
   name: "omavoice",
   description: "Omavoice"
@@ -42,6 +46,23 @@ test("USB and omavoice name detection", () => {
   assert.equal(Model.isOmavoiceName("omavoice.aec"), true)
   assert.equal(Model.isCaptureSourceName("omavoice"), false)
   assert.equal(Model.isCaptureSourceName(usb.name), true)
+})
+
+test("Apple Silicon mapped mic is a capture source and a builtin", () => {
+  assert.equal(Model.isAppleBuiltinSourceName(appleBuiltin.name), true)
+  assert.equal(Model.isUsbSourceName(appleBuiltin.name), false)
+  assert.equal(Model.isCaptureSourceName(appleBuiltin.name), true)
+  assert.equal(Model.sourceKind(appleBuiltin.name), "builtin")
+})
+
+test("pickSource prefers the mapped builtin over an alsa headset jack", () => {
+  const picked = Model.pickSource([builtin, appleBuiltin], "", "")
+  assert.equal(picked.name, appleBuiltin.name)
+})
+
+test("pickSource honours an explicit default over the mapped builtin", () => {
+  const picked = Model.pickSource([builtin, appleBuiltin], "", builtin.name)
+  assert.equal(picked.name, builtin.name)
 })
 
 test("sourcesUnchanged ignores object identity and node ids", () => {
